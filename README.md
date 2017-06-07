@@ -7,7 +7,7 @@ First, the script helps you to upload all the svgs to http://fontello.com via AP
 Second, the script helps you to add new svgs to the existing font collection.
 
 # How to use this script
-Create a folder called 'svgs' where you can place all your svgs and run 'node script.js' in the terminal. Then you will get a zip file downloaded for you. Please remember to remove all the svgs in the './svgs' folder after you check everything is fine as well as the zip file.
+Place your svg files in the folder called 'svgs' and run 'node script.js' in the terminal. Then you will get a zip file downloaded for you. Please remember to remove all the svgs in the './svgs' folder and the zip file after you check everything is fine.
 
 A file called 'config.json' would be generated to keep track of your font info. Next time if you want to update your font collection, just drop the new svg files to the './svgs' and run 'node script.js' again. Don't remove the config.json file.
 
