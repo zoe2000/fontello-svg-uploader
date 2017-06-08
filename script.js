@@ -1,3 +1,4 @@
 var components = require('./libs/components.js')
-components.prepareConfigFile();
+
+components.uploadSVG();
 

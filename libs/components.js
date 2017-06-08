@@ -22,78 +22,86 @@ function hexCode() {
 }
 
 function singleGiphyInfo(uid, css, code, svg_path, width) {
-  var info = {}
-  info['uid'] = uid
-  info['css'] = css
-  info['code'] = code
-  info['src'] = 'custom_icons'
-  info['selected'] = true
-  info['svg'] = {'path' : svg_path, 'width': width};
-  info['search'] = []
-  info['search'].push(css)
+  var info = { uid: uid, css: css, code: code, src: 'custom_icons', selected: true, svg: { path: svg_path, width: width}, search: [css] }
   return info
 }
 
 function fillConfigParams(glyphs_info) {
-  var config = {}
-  config['name'] = ''
-  config['css_prefix_text'] = 'icon-'
-  config['css_use_suffix'] = false
-  config['hinting'] = true
-  config['units_per_em'] = 1000
-  config['ascent'] = 850
-  config['glyphs'] = glyphs_info
+  var config = { name: '', css_prefix_text: 'icon-', css_use_suffix: false, hinting: true, units_per_em: 1000, ascent: 850, glyphs: glyphs_info }
   return config
 }
 
-function sendFile() {
-  shell.exec("curl --form 'config=@./config.json' http://fontello.com",function(code, stdout, stderr) {
-    var session_id = stdout
-    var target_url = "http://fontello.com/" + session_id + '/get'
-    var command = "curl -o ./font.zip" + " " + target_url
-    shell.exec(command)
+function sendFile(glyphs_info) {
+  if (glyphs_info.length > 0) {
+    var config_file = JSON.stringify(fillConfigParams(glyphs_info))
+    fs.writeFile('./config.json', config_file, 'utf8')
+    shell.exec("curl --form 'config=@./config.json' http://fontello.com",function(code, stdout, stderr) {
+      var session_id = stdout
+      var target_url = "http://fontello.com/" + session_id + '/get'
+      var command = "curl -o ./font.zip" + " " + target_url
+      shell.exec(command)
+    })
+  } else {
+    throw 'There is no valid svg file in the directory, please check again'
+  }
+
+}
+
+function checkExistingConfigFile(config_file_exists) {
+  var files = fs.readdirSync('.')
+  files.forEach(function(file) {
+    if (path.basename(file) == 'config.json') {
+      config_file_exists = true
+      var existing_font_info = JSON.parse(fs.readFileSync('./config.json','utf8')).glyphs
+      existing_font_info.forEach(function(item) {
+        glyphs_info.push(item)
+      })
+    }
+  })
+  if (config_file_exists) {
+    var remove_file_command = 'rm ./config.json'
+    shell.exec(remove_file_command)
+  }
+}
+
+function prepareConfigFile(glyphs_info) {
+  var svgs = fs.readdirSync('./svgs')
+  svgs.forEach(function(file) {
+    if (path.extname(file) == '.svg') {
+      var path_name = path.join('./svgs', file)
+      var data = fs.readFileSync(path_name, 'utf8')
+      // TO DO: throw exceptions and catch
+      var result = svg_image_flatten(data)
+      if (result.d) {
+        var scale = 1000 / result.height
+        var width = Math.round(result.width * scale)
+        var d = new SvgPath(result.d).translate(-result.x, -result.y).scale(scale).abs().round(1).toString();
+        glyphs_info.push(singleGiphyInfo(hexCode(),path.basename(file).split('.')[0], fiveDigitCode(), d, width))
+      } else {
+        var file = path.basename(file)
+        throw 'Sorry, there is something wrong with this svg: ' + file + '. Please fix it and retry.' 
+      }
+
+    }
   })
 }
 
 module.exports = {
-  prepareConfigFile: function() {
+  uploadSVG: function() {
     var glyphs_info = []
     var config_file_exists = false
-    var svgs = fs.readdirSync('./svgs')
-    svgs.forEach(function(file){
-      if (path.extname(file) == '.svg') {
-        var path_name = path.join('./svgs', file)
-        var data = fs.readFileSync(path_name, 'utf8')
-        var result = svg_image_flatten(data)
-        var height = result.height
-        var scale = 1000 / height
-        var width = Math.round(result.width * scale)
-        var d = new SvgPath(result.d).translate(-result.x, -result.y).scale(scale).abs().round(1).toString();
-        var css = path.basename(file).split('.')[0]
-        var uid = hexCode()
-        var code = fiveDigitCode()
-        var single_glyph_info = singleGiphyInfo(uid, css, code, d, width)
-        glyphs_info.push(single_glyph_info)
-      }
-    })
-    // if there is an existing config.json file, then we need to extract the existing info and insert it into the glyphs_info as well
-    var files = fs.readdirSync('.')
-    files.forEach(function(file) {
-      if (path.extname(file) == '.json') {
-        config_file_exists = true
-        var existing_font_info = JSON.parse(fs.readFileSync('./config.json','utf8')).glyphs
-        existing_font_info.forEach(function(item) {
-          glyphs_info.push(item)
-        })
-      }
-    })
-    if (config_file_exists) {
-      var remove_file_command = 'rm ./config.json'
-      shell.exec(remove_file_command)
+    try {
+      prepareConfigFile(glyphs_info)
+    } catch(message) {
+      console.log(message)
+      return
     }
-    var config_file = JSON.stringify(fillConfigParams(glyphs_info))
-    fs.writeFile('./config.json', config_file, 'utf8')
-    sendFile()
+    checkExistingConfigFile(config_file_exists)
+    try {
+      sendFile(glyphs_info)
+    } catch (message) {
+      console.log(message)
+    }
   }
 }
 
